@@ -106,6 +106,12 @@ spec:
 ingress-nginx::
 +
 --
+[WARNING]
+.ingress-nginx EOL
+====
+ingress-nginx upstream becomes https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/[EOL] in March 2026 and is deprecated in RKE2 v1.36 minor. Rancher Prime RKE2 users will still get support and CVE fixes (8+) for the whole lifecycle of RKE2 minors v1.32, v1.33, v1.34, v1.35 and v1.36. Whenever you are ready, we recommend you switching to Traefik following our https://support.scc.suse.com/s/kb/Migrating-from-Ingress-NGINX-to-Traefik-in-a-standalone-RKE2-cluster?language=es[official guide]
+====
+
 https://github.com/kubernetes/ingress-nginx[ingress-nginx] is an Ingress controller powered by NGINX that uses a ConfigMap to store the NGINX configuration.
 
 `ingress-nginx` is deployed by default when starting the server. Ports 80 and 443 will be bound by the ingress controller in its default configuration, making these unusable for HostPort or NodePort services in the cluster.
