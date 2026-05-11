@@ -1,6 +1,6 @@
 = Helm
 :page-languages: [en, zh]
-:revdate: 2025-11-06
+:revdate: 2026-05-11
 :page-revdate: {revdate}
 
 Helm 是 Kubernetes 的包管理工具。Helm Chart 为 Kubernetes YAML 清单文件提供了模板语法。通过 Helm，用户可以创建可配置的 deployment，而不仅仅只能使用静态文件。如果你需要创建自己的 Deployment 商店应用，请参见 https://helm.sh/docs/intro/quickstart/[Helm 文档]。
@@ -101,6 +101,13 @@ spec:
 | Base64 编码的 chart archive .tgz，覆盖 spec.chart
 | CHART
 |===
+
+Find the full API in the https://github.com/k3s-io/helm-controller/blob/master/doc/helmchart.md#HelmChart[auto-generated API docs].
+
+[NOTE]
+====
+Consider setting `failurePolicy: abort` for complex helm charts (e.g. Rancher) or for CNI plugins during upgrades. While the default `reinstall` policy is effective for general applications, it can be disruptive for certain critical infrastructure components. The default failure policy triggers an automatic uninstall and reinstall of the chart if the Helm upgrade operation is interrupted and the chart release is stuck in a pending state. This uninstallation can tear down networking or delete critical CRDs, leading to cluster-wide disruption. Setting the policy to `abort` ensures the failed chart release is left in place for manual troubleshooting, potentially avoiding further disruption.
+====
 
 == 使用 HelmChartConfig 自定义打包组件
 

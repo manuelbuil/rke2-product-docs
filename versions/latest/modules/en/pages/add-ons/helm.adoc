@@ -1,6 +1,6 @@
 = Helm
 :page-languages: [en, zh]
-:revdate: 2025-11-06
+:revdate: 2026-05-11
 :page-revdate: {revdate}
 
 Helm is the package management tool of choice for Kubernetes. Helm charts provide templating syntax for Kubernetes YAML manifest documents. With Helm we can create configurable deployments instead of just using static files. For more information about creating your own catalog of deployments, check out the docs at https://helm.sh/docs/intro/quickstart/.
@@ -220,6 +220,13 @@ data:
 | Base64-encoded chart archive .tgz - overrides spec.chart
 | CHART
 |===
+
+Find the full API in the https://github.com/k3s-io/helm-controller/blob/master/doc/helmchart.md#HelmChart[auto-generated API docs].
+
+[NOTE]
+====
+Consider setting `failurePolicy: abort` for complex helm charts (e.g. Rancher) or for CNI plugins during upgrades. While the default `reinstall` policy is effective for general applications, it can be disruptive for certain critical infrastructure components. The default failure policy triggers an automatic uninstall and reinstall of the chart if the Helm upgrade operation is interrupted and the chart release is stuck in a pending state. This uninstallation can tear down networking or delete critical CRDs, leading to cluster-wide disruption. Setting the policy to `abort` ensures the failed chart release is left in place for manual troubleshooting, potentially avoiding further disruption.
+====
 
 == Customizing Packaged Components with HelmChartConfig
 
