@@ -1,6 +1,6 @@
 = Network Options
 :page-languages: [en, zh]
-:revdate: 2026-07-10
+:revdate: 2026-07-31
 :page-revdate: {revdate}
 
 Kubernetes requires installation of one or more CNI Plugins to provide Pod networking. RKE2 bundles four primary CNI Plugins: Canal, Cilium, Calico, and Flannel. Only Calico and Flannel support Microsoft Windows. RKE2 also includes Multus as a secondary CNI Plugin, which must be enabled alongside a primary CNI Plugin. For more information, see the xref:networking/multus_sriov.adoc[Multus] documentation.
@@ -384,7 +384,7 @@ kube-proxy-arg:
 Each CNI needs to be configured through its `HelmChartConfig`.
 
 [tabs]
-====
+=====
 Canal CNI Plugin::
 +
 --
@@ -433,7 +433,14 @@ spec:
     installation:
       calicoNetwork:
         linuxDataplane: Nftables
+        # Set to Disabled if you don't need hostPorts in your cluster.
+        #hostPorts: Disabled
 ----
+
+[NOTE]
+====
+Calico relies on the https://www.cni.dev/plugins/current/meta/portmap/[portmap] plugin to implement Kubernetes `hostPorts` which https://github.com/containernetworking/plugins/issues/1280[always tries] to use `iptables` even when it is not available on the nodes. To remedy this, you can either install `iptables` on your nodes or disable `hostPorts` entirely as shown above.
+====
 --
 
 Flannel CNI Plugin::
@@ -456,4 +463,4 @@ spec:
       enableNFTables: true
 ----
 --
-====
+=====
