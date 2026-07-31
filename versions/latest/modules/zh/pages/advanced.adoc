@@ -1,6 +1,6 @@
 = 高级选项和配置
 :page-languages: [en, zh]
-:revdate: 2026-03-10
+:revdate: 2026-07-31
 :page-revdate: {revdate}
 
 本文描述了用于运行和管理 RKE2 的高级设置：
@@ -51,6 +51,14 @@ You can extend the RKE2 base template instead of copy-pasting the complete stock
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes."custom".options]
   BinaryName = "/usr/bin/custom-container-runtime"
 ----
+
+== Configuring DNS Resolution
+
+=== Nameserver Viability Checks
+
+On startup, each node checks the files at `/etc/resolv.conf` and `/run/systemd/resolve/resolv.conf` for loopback, multicast, or link-local nameservers. If no such entries are found, the Kubelet is configured to use the file as its resolver configuration file, via the `--resolv-conf` flag. RKE2 performs these checks because nameserver addresses of these types would not function properly within pods that https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy[inherit name resolution configuration] from their node. If no usable resolv.conf is found, RKE2 will print a warning message to the logs, and generate a stub resolver configuration that uses `8.8.8.8` and `2001:4860:4860::8888` as the nameservers.
+
+If you want to provide RKE2 with an alternative resolver configuration without modifying the system configuration files, you may use the `--resolv-conf` option to specify the path to a suitable file. Manually specified resolver configuration files are not subject to viability checks.
 
 == 配置 HTTP 代理
 
