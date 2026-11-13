@@ -4,7 +4,7 @@
 :revdate: 2026-10-06
 :page-revdate: {revdate}
 
-`rke2-patcher` is a CLI tool for SUSE Rancher Prime: RKE2 that helps operators inspect and patch packaged component images.
+`rke2-patcher` is a tool for SUSE Rancher Prime: RKE2 that helps operators inspect and patch packaged component images. It can be used two ways: as a CLI, run interactively or scripted; or as a Kubernetes controller that reconciles declarative `ImagePatch` objects, which suits fleets of clusters managed through GitOps.
 
 The primary use case for `rke2-patcher` is to consume component images that include serious CVE fixes before the next monthly RKE2 release is available. The built-in patching limitations are intentional and are designed to encourage timely RKE2 upgrades, rather than carrying `rke2-patcher` overrides indefinitely on the same RKE2 version.
 
@@ -56,9 +56,9 @@ The tool can be used to inspect the images that are currently running in an RKE2
 [#_installation_3]
 == Installation
 
-You can use `rke2-patcher` either as a locally built CLI binary or as a pod running inside the cluster.
+You can use `rke2-patcher` as a locally built CLI binary or as a controller that reconciles `ImagePatch` objects; see <<_declarative_mode_imagepatch_controller,Declarative mode: ImagePatch controller>>.
 
-`rke2-patcher` can be found in the https://scc.suse.com/rancher-docs/rancherprime/latest/en/reference-guide.html#prime-artifacts-url[Prime Artifacts URL].
+The `rke2-patcher` binary can be found in the https://scc.suse.com/rancher-docs/rancherprime/latest/en/reference-guide.html#prime-artifacts-url[Prime Artifacts URL].
 
 [#_rke2_patcher_cli]
 == rke2-patcher CLI
@@ -195,8 +195,84 @@ image::rke2-patcher-image-reconcile.gif[rke2-patcher image-reconcile demo, width
 
 For complete behavior and command details, refer to the upstream project documentation: https://github.com/rancher/rke2-patcher.
 
+[#_declarative_mode_imagepatch_controller]
+== Declarative mode: ImagePatch controller
+
+Besides the CLI, `rke2-patcher controller` runs a Kubernetes controller that reconciles `ImagePatch` objects (`patcher.rke2.cattle.io/v1alpha1`, cluster-scoped). This suits fleets of clusters: distribute `ImagePatch` objects (for example with Fleet) and every cluster enforces its own guardrails, with no CLI commands to run by hand.
+
+[IMPORTANT]
+====
+The CLI and the controller are exclusive modes on the same cluster. While any `ImagePatch` object exists, `rke2-patcher image-patch` refuses to run. `image-reconcile` keeps working in either mode, since it only reverts patches made with the CLI.
+====
+
+[#_installing_the_controller]
+=== Installing the controller
+
+Requirements:
+
+* An RKE2 Prime cluster (`prime: true`) and `kubectl` plus `helm` with cluster-admin access to it.
+* An `rke2-patcher` image that contains the controller. Release images are published to the Rancher Prime registry (`registry.rancher.com/rancher/rke2-patcher`).
+
+Install the chart into its own namespace:
+
+[,bash]
+----
+helm upgrade --install rke2-patcher oci://registry.rancher.com/rancher/charts/rke2-patcher \
+  --namespace rke2-patcher --create-namespace \
+  --set image.repository=registry.rancher.com/rancher/rke2-patcher \
+  --set image.tag=<version>
+----
+
+Use the `rke2-patcher` namespace: the chart's templates expect it, and the controller uses it for leader election. The chart installs the `ImagePatch` CRD (`imagepatches.patcher.rke2.cattle.io`), a ServiceAccount with a ClusterRole/ClusterRoleBinding, and a Deployment on control-plane nodes running `rke2-patcher controller` with leader election. The same image also ships the CLI, so `kubectl exec` still works.
+
+Verify it is running:
+
+[,bash]
+----
+kubectl -n rke2-patcher rollout status deployment/rke2-patcher
+kubectl get crd imagepatches.patcher.rke2.cattle.io
+----
+
+[#_using_imagepatch_objects]
+=== Using ImagePatch objects
+
+[,yaml]
+----
+apiVersion: patcher.rke2.cattle.io/v1alpha1
+kind: ImagePatch
+metadata:
+  name: rke2-coredns          # must equal spec.component (one ImagePatch per component)
+spec:
+  component: rke2-coredns
+  tag: v1.14.7-build20261020  # exact tag, as with `image-patch --tag`
+  upgradePolicy: Manual       # Manual (default) | AutoRevert
+----
+
+[,bash]
+----
+kubectl get imagepatches      # TAG, APPLIED, BASELINE, READY, REASON
+----
+
+The same guardrails as `image-patch` apply: Prime only, tag newer than the bundled tag, same minor release line, the 45-day patch window (`rke2-ingress-nginx` exempt), and no patches while stale patches from a previous RKE2 version exist. Violations surface as a `Blocked` condition with a reason, for example `OutsidePatchWindow`, `MinorVersionChange`, `TagNotFound`, `NotNewer`, `NotPrime`, `StalePatchesExist`, or `ConflictingOverride`; nothing is written to the cluster.
+
+* Setting `spec.tag` to the bundled tag reverts the patch but keeps the `ImagePatch` object (`Ready=True`, reason `AtBaseline`).
+* Deleting an `ImagePatch` reverts the patch: a finalizer strips the patcher-managed values before the object is removed.
+* If the patcher-managed values are edited or removed by hand on the underlying `HelmChartConfig`, the controller puts `spec.tag` back (`DriftCorrected` event).
+* If the bundled tag ever becomes newer than the applied `spec.tag`, the patch is reverted (`Blocked`, reason `NotNewer`) instead of keeping an older image.
+
+[#_after_an_rke2_upgrade]
+=== After an RKE2 upgrade
+
+* `upgradePolicy: Manual` (default): nothing is touched. The `ImagePatch` becomes `Stale`; delete it to revert the component to the image bundled with the new release.
+* `upgradePolicy: AutoRevert`: the patch is reverted automatically to the newly bundled image, even if `spec.tag` would still be valid on the new release. The object stays, with `Ready=False` and reason `RevertedAfterUpgrade`. Set a new `spec.tag` to patch again.
+
 [#_airgap_support]
 == Airgap support
+
+[IMPORTANT]
+====
+Only the rke2-patcher CLI is supported in Airgap environments
+====
 
 `rke2-patcher` can be used in airgapped environments when required artifacts are mirrored and reachable inside your private network.
 
